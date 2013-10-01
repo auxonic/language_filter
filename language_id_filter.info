@@ -1,0 +1,5 @@
+name = Language Identification Filter
+description = The Virtual Museum of Canada requires language different from the page language be identified with <span> tags.  This module provides a shorthand: [fr]Crème brûlée[/fr]. Warning. This module will break page titles etc. if used there.  Templates can use the language_id_filter_filter_quick_process($text, TRUE) function to strip out the [fr] tags.
+package = Multilingual - Internationalization
+core = 7.x
+files[] = language_id_filter.module

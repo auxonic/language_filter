@@ -1,0 +1,156 @@
+<?php
+/**
+ * @file language_id_filter.module
+ *
+ * Text filter for title and identified text fields to auto expand language
+ * shorthand to full span text to satsify MVC rules
+ *
+ * [fr]TEST[/fr]
+ *
+ * becomes
+ *
+ * <span xml:lang="fr" lang="fr">TEST</span>
+ *
+ */
+
+/**
+ * Implements hook_help().
+ */
+function language_id_filter_help($path, $arg) {
+  switch ($path) {
+    case 'admin/help#language_id_filter':
+      return t("Text filter for title and identified text fields to auto expand language shorthand to full span text to satsify MVC rules.<br/>This filter should be at the very end since the html corrector filter can double up on the xml:lang attribute.");
+  }
+}
+
+
+
+/**
+ * Implements hook_element_info_alter().
+ */
+function language_id_filter_element_info_alter(&$types) {
+  foreach ($types as $type => &$info) {
+    $info += array('#pre_render' => array());
+    array_unshift($info['#pre_render'], 'language_id_filter_pre_render');
+  }
+}
+
+/**
+ * #pre_render callback for any element.
+ */
+function language_id_filter_pre_render($element) {
+  foreach (array('#title', '#description', '#markup') as $property) {
+    if (isset($element[$property])) {
+      $element[$property] = language_id_filter_filter_process($element[$property]);
+    }
+  }
+  return $element;
+}
+
+/**
+ * Implements hook_filter_info().
+ */
+function language_id_filter_filter_info() {
+  $filters['pirate'] = array(
+    'title' => t('MVC language filter'),
+    'description' => t('Text filter for title and identified text fields to auto expand language shorthand to full span text to satsify MVC rules.'),
+    'process callback' => 'language_id_filter_filter_process',
+    /*'settings callback' => 'language_id_filter_filter_settings',
+    'default settings' => array(
+      'language_id_filter_display_tip' => 1,
+    ),*/
+    'tips callback' => 'language_id_filter_filter_tips',
+  );
+  return $filters;
+}
+
+/**
+ * Filter process callback for Pirate filter.
+ */
+function language_id_filter_filter_process($text) {
+  //return $text;
+  // Most of the following code is taken from Drupal core's Filter module
+  // in order to exclude text within tags, such as URLs that might get
+  // modified using the replacement patterns.
+  $ignore_tags = 'a|script|style|code|pre';
+  $open_tag = '';
+
+  $pattern_search = '/\[([a-zA-Z]{2,3})\](.*?)\[\/\1\]/';
+  $pattern_replace = '<span class="alt-lang lang-${1}" xml:lang="${1}" lang="${1}">${2}</span>';
+
+  return preg_replace($pattern_search, $pattern_replace, language_id_filter_fix_quotes($text));
+}
+
+function language_id_filter_filter_quick_process($text, $clean = FALSE) {
+  $pattern_search = '/\[([a-zA-Z]{2,3})\](.*?)\[\/\1\]/';
+  if ($clean) {
+    $pattern_replace = '${2}';
+  } else {
+    $pattern_replace = '<span class="alt-lang lang-${1}" xml:lang="${1}" lang="${1}">${2}</span>';
+  }
+
+  $text = preg_replace($pattern_search, $pattern_replace, $text);
+  $text = language_id_filter_fix_quotes($text);
+
+  if ($clean) {
+    return check_plain($text);
+  } else {
+    return $text;
+  }
+}
+
+function language_id_filter_fix_quotes($text) {
+  $text =  preg_replace('/\*\*(.*?)\*\*/', '<strong>${1}</strong>', $text, 1);
+  $text =  preg_replace('/\*(.*?)\*/', '<em>${1}</em>', $text, 1);
+
+  return strtr($text, array(
+    ' :' => '&nbsp;:',
+    '« ' => '«&nbsp;',
+    ' »' => '&nbsp;»',
+  ));
+}
+
+/**
+ * Filter tips callback for Pirate filter.
+ */
+/*function language_id_filter_filter_tips($filter, $format, $long = FALSE) {
+  if ($filter->settings['language_id_filter_display_tip']) {
+    return t('Avast! This website be taken over by pirates on September 19th. Yarr!');
+  }
+}*/
+
+/*
+ * Implements hook_tokens_alter
+ *
+ * Alter title token to remove tags
+ */
+function language_id_filter_tokens_alter(array &$replacements, array $context) {
+  /*$options = $context['options'];
+
+  if (isset($options['language'])) {
+    $url_options['language'] = $options['language'];
+    $language_code = $options['language']->language;
+  }
+  else {
+    $language_code = NULL;
+  }
+  $sanitize = !empty($options['sanitize']);
+*/
+
+ if ($context['type'] == 'node') {
+  //kpr($context);
+  //kpr($replacements);
+
+    $node = $context['data']['node'];
+
+    if (!isset($context['tokens']['title'])) {
+      $context['tokens']['title'] = '[node:title]';
+    }
+
+    $title = $node->title;
+    if (function_exists('language_id_filter_filter_quick_process')) {
+      $title = language_id_filter_filter_quick_process($title, TRUE);
+    }
+    $replacements[$context['tokens']['title']] = $title;
+  }
+}
